@@ -1,6 +1,6 @@
 <p align="center"><img src="sc_file_content_exporter.png" width="600" alt="screenshot"></p>
 
-# eDock File Content Exporter
+# eDock Files2Prompt
 
 A simple eDock app for exporting file contents into a clean text format.
 
@@ -25,6 +25,6 @@ This app helps you collect selected files from a project and export their conten
 
 ## App Info
 
-- App name: eDock File Content Exporter
+- App name: eDock Files2Prompt
 - Type: eDock app
 - Purpose: Export file content for AI assistance
