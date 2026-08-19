@@ -3,7 +3,7 @@ from core.app.app_base import AppBase
 from .ui import ExporterWindow
 
 
-class FileContentExporterApp(AppBase):
+class Files2PromptApp(AppBase):
     def on_init(self):
         self.window = None
 
@@ -27,4 +27,4 @@ class FileContentExporterApp(AppBase):
             self.window.show_and_activate()
 
 
-App = FileContentExporterApp
+App = Files2PromptApp
