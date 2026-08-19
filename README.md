@@ -17,7 +17,7 @@ This app helps you collect selected files from a project and export their conten
 
 ## Usage
 
-1. Open eDock.
+1. Open <a href="https://github.com/emanf/eDock">eDock</a>.
 2. Launch File Content Exporter.
 3. Select the files you want to export.
 4. Copy or save the exported content.
