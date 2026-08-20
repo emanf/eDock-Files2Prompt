@@ -1,4 +1,4 @@
-<p align="center"><img src="ss_files2prompt.png" width="600" alt="screenshot"></p>
+<p align="center"><img src="ss_files2prompt.png?v=1" width="600" alt="screenshot"></p>
 
 # eDock Files2Prompt
 
