@@ -18,12 +18,13 @@ This app helps you collect selected files from a project and export their conten
 ## Usage
 
 1. Open <a href="https://github.com/emanf/eDock">eDock</a>.
-2. Launch Files2Prompt app.
-3. Select the root folder.
-4. Select the files you want to export.
-5. Click on the preview button.
-6. Copy or save the exported content.
-7. Send it to an AI assistant when needed.
+2. Launch Spotlight app and type: `>Files2Prompt` and install it.
+3. Launch Files2Prompt app.
+4. Select the root folder.
+5. Select the files you want to export.
+6. Click on the preview button.
+7. Copy or save the exported content.
+8. Send it to an AI assistant when needed.
 
 ## App Info
 
