@@ -1,5 +1,6 @@
 import os
 import json
+import fnmatch
 from html import escape
 
 from core import paths
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QLineEdit,
     QTextEdit,
+    QPlainTextEdit,
     QGroupBox,
     QSplitter,
     QFrame,
@@ -23,15 +25,30 @@ from PySide6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QMenu,
+    QDialog,
+    QDialogButtonBox,
 )
 from PySide6.QtCore import Qt, QTimer, QPoint
 from PySide6.QtGui import QGuiApplication
 
-from core.ui.base_ui import eD_UIBase
+from core.ui.base_ui import BaseUI
 from core.ui.dialogs.message_dialog import MessageDialog
 
 
-class ExporterWindow(QMainWindow, eD_UIBase):
+class ExporterWindow(QMainWindow, BaseUI):
+    DEFAULT_EXCLUDES = [
+        ".git/",
+        "__pycache__/",
+        "node_modules/",
+        ".venv/",
+        "venv/",
+        "*.pyc",
+        "*.pyo",
+        ".DS_Store",
+        "dist/",
+        "build/",
+    ]
+
     def __init__(self, app_ref=None, parent=None):
         super().__init__(parent)
         self._init_ui_base(app=app_ref, context=getattr(app_ref, "context", None))
@@ -46,6 +63,8 @@ class ExporterWindow(QMainWindow, eD_UIBase):
         self._source_text = ""
         self._preview_parts = []
         self._preview_part_index = 0
+        self._exclude_patterns = list(self.DEFAULT_EXCLUDES)
+        self._compiled_excludes = []
 
         self._status_timer = QTimer(self)
         self._status_timer.setSingleShot(True)
@@ -55,7 +74,7 @@ class ExporterWindow(QMainWindow, eD_UIBase):
 
         self._build_ui()
         self._apply_ui_style()
-        self._load_last_root()
+        self._load_settings()
 
     def _build_ui(self):
         central = QWidget()
@@ -96,12 +115,16 @@ class ExporterWindow(QMainWindow, eD_UIBase):
         self.btn_scan = QPushButton("Scan Root")
         self.btn_scan.clicked.connect(self.scan_root)
 
+        self.btn_excludes = QPushButton("Exclude Patterns")
+        self.btn_excludes.clicked.connect(self.open_exclude_dialog)
+
         self.btn_export = QPushButton("Export")
         self.btn_export.setObjectName("primaryButton")
         self.btn_export.clicked.connect(self.export_selected)
 
         action_row.addWidget(self.btn_select)
         action_row.addWidget(self.btn_scan)
+        action_row.addWidget(self.btn_excludes)
         action_row.addStretch()
         action_row.addWidget(self.btn_export)
         header_layout.addLayout(action_row)
@@ -281,6 +304,9 @@ class ExporterWindow(QMainWindow, eD_UIBase):
             QMainWindow {
                 background: #111318;
             }
+            QDialog {
+                background: #111318;
+            }
             QWidget {
                 color: #e8eaed;
                 font-size: 13px;
@@ -318,6 +344,7 @@ class ExporterWindow(QMainWindow, eD_UIBase):
             }
             QLineEdit,
             QTextEdit,
+            QPlainTextEdit,
             QListWidget,
             QComboBox,
             QSpinBox {
@@ -606,9 +633,17 @@ class ExporterWindow(QMainWindow, eD_UIBase):
         style = style.replace("__CHEVRON_UP__", chevron_up)
         self.setStyleSheet(style)
 
-    def _load_last_root(self):
+    def _load_settings(self):
         try:
-            cfg = self._load_cache_config() or {}
+            cfg = self._load_data_config() or {}
+
+            patterns = cfg.get("exclude_patterns")
+
+            if not isinstance(patterns, list):
+                patterns = list(self.DEFAULT_EXCLUDES)
+
+            self._exclude_patterns = patterns
+
             saved = cfg.get("last_root", "")
 
             if saved and os.path.isdir(saved):
@@ -629,11 +664,186 @@ class ExporterWindow(QMainWindow, eD_UIBase):
             self.lbl_root.setText(path)
 
             try:
-                self._save_cache_config({"last_root": path})
+                self._save_data_config({"last_root": path})
             except Exception:
                 pass
 
             self.scan_root()
+
+    def open_exclude_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Exclude Patterns")
+        dialog.setMinimumSize(480, 440)
+
+        dialog_layout = QVBoxLayout()
+        dialog_layout.setContentsMargins(16, 16, 16, 16)
+        dialog_layout.setSpacing(10)
+        dialog.setLayout(dialog_layout)
+
+        hint = QLabel(".gitignore-style, one pattern per line")
+        hint.setObjectName("metaLabel")
+        dialog_layout.addWidget(hint)
+
+        editor = QPlainTextEdit()
+        editor.setPlaceholderText(
+            "*.pyc\nnode_modules/\nbuild/\n!keep.txt"
+        )
+        editor.setPlainText("\n".join(self._exclude_patterns))
+        dialog_layout.addWidget(editor, 1)
+
+        tools_row = QHBoxLayout()
+        tools_row.setSpacing(8)
+
+        btn_load = QPushButton("Load from File")
+        btn_load.clicked.connect(
+            lambda: self._load_patterns_from_file(editor)
+        )
+
+        btn_reset = QPushButton("Reset to Defaults")
+        btn_reset.clicked.connect(
+            lambda: editor.setPlainText(
+                "\n".join(self.DEFAULT_EXCLUDES)
+            )
+        )
+
+        tools_row.addWidget(btn_load)
+        tools_row.addWidget(btn_reset)
+        tools_row.addStretch()
+        dialog_layout.addLayout(tools_row)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        dialog_layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.Accepted:
+            self._exclude_patterns = editor.toPlainText().splitlines()
+
+            try:
+                self._save_data_config(
+                    {"exclude_patterns": self._exclude_patterns}
+                )
+            except Exception:
+                pass
+
+            self._show_temp_status(
+                "Exclude patterns updated",
+                color="#22c55e",
+            )
+
+            if self.root_path and os.path.isdir(self.root_path):
+                self.scan_root()
+
+    def _load_patterns_from_file(self, editor):
+        start_dir = (
+            self.root_path
+            if self.root_path and os.path.isdir(self.root_path)
+            else ""
+        )
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Patterns from File",
+            start_dir,
+            "All files (*)",
+        )
+
+        if not filename:
+            return
+
+        try:
+            with open(
+                filename,
+                "r",
+                encoding="utf-8",
+                errors="replace",
+            ) as file:
+                content = file.read()
+        except Exception as error:
+            MessageDialog.error(
+                self,
+                "Error",
+                f"Failed to read file: {error}",
+            )
+            return
+
+        existing = editor.toPlainText().splitlines()
+        merged = list(existing)
+
+        for line in content.splitlines():
+            if line not in merged:
+                merged.append(line)
+
+        editor.setPlainText("\n".join(merged))
+
+    def _get_ui_exclude_patterns(self):
+        return list(self._exclude_patterns)
+
+    def _compile_excludes(self):
+        compiled = []
+
+        for raw in self._exclude_patterns:
+            line = raw.strip()
+
+            if not line or line.startswith("#"):
+                continue
+
+            negate = False
+
+            if line.startswith("!"):
+                negate = True
+                line = line[1:].strip()
+
+            if not line:
+                continue
+
+            dir_only = line.endswith("/")
+
+            if dir_only:
+                line = line.rstrip("/")
+
+            anchored = line.startswith("/")
+
+            if anchored:
+                line = line.lstrip("/")
+
+            if not line:
+                continue
+
+            compiled.append((line, negate, dir_only, anchored))
+
+        return compiled
+
+    def _pattern_matches(self, pattern, anchored, name, rel_posix):
+        if anchored:
+            return (
+                fnmatch.fnmatch(rel_posix, pattern)
+                or fnmatch.fnmatch(rel_posix, pattern + "/*")
+            )
+
+        if "/" in pattern:
+            return (
+                fnmatch.fnmatch(rel_posix, pattern)
+                or fnmatch.fnmatch(rel_posix, "*/" + pattern)
+                or fnmatch.fnmatch(rel_posix, pattern + "/*")
+                or fnmatch.fnmatch(rel_posix, "*/" + pattern + "/*")
+            )
+
+        return fnmatch.fnmatch(name, pattern)
+
+    def _is_excluded(self, rel_posix, name, is_dir):
+        result = False
+
+        for pattern, negate, dir_only, anchored in self._compiled_excludes:
+            if dir_only and not is_dir:
+                continue
+
+            if self._pattern_matches(pattern, anchored, name, rel_posix):
+                result = not negate
+
+        return result
 
     def scan_root(self):
         self._all_files = []
@@ -648,12 +858,46 @@ class ExporterWindow(QMainWindow, eD_UIBase):
             self._update_stats()
             return
 
-        for dirpath, _, filenames in os.walk(self.root_path):
+        self._compiled_excludes = self._compile_excludes()
+
+        for dirpath, dirnames, filenames in os.walk(self.root_path):
+            rel_dir = os.path.relpath(dirpath, self.root_path)
+
+            if rel_dir == ".":
+                rel_dir = ""
+
+            kept_dirs = []
+
+            for dirname in dirnames:
+                rel = (
+                    f"{rel_dir}/{dirname}"
+                    if rel_dir
+                    else dirname
+                )
+                rel_posix = rel.replace(os.sep, "/")
+
+                if self._is_excluded(rel_posix, dirname, True):
+                    continue
+
+                kept_dirs.append(dirname)
+
+            dirnames[:] = kept_dirs
+
             for filename in filenames:
+                rel = (
+                    f"{rel_dir}/{filename}"
+                    if rel_dir
+                    else filename
+                )
+                rel_posix = rel.replace(os.sep, "/")
+
+                if self._is_excluded(rel_posix, filename, False):
+                    continue
+
                 full = os.path.join(dirpath, filename)
-                rel = os.path.relpath(full, self.root_path)
-                self._all_files.append(rel)
-                self._file_checks[rel] = False
+                rel_display = os.path.relpath(full, self.root_path)
+                self._all_files.append(rel_display)
+                self._file_checks[rel_display] = False
 
         self._all_files.sort(key=lambda value: value.lower())
         self.refresh_files_view()
@@ -1316,10 +1560,14 @@ class ExporterWindow(QMainWindow, eD_UIBase):
 
     def closeEvent(self, event):
         try:
+            updates = {
+                "exclude_patterns": list(self._exclude_patterns)
+            }
+
             if self.root_path:
-                self._save_cache_config(
-                    {"last_root": self.root_path}
-                )
+                updates["last_root"] = self.root_path
+
+            self._save_data_config(updates)
         except Exception:
             pass
 
@@ -1421,8 +1669,49 @@ class ExporterWindow(QMainWindow, eD_UIBase):
 
         return {}
 
-    def _save_cache_config(self, updates: dict):
-        config_path = self._cache_config_path()
+    def _data_config_path(self):
+        try:
+            app_id = (
+                getattr(self.app, "id", None)
+                or getattr(
+                    self.app,
+                    "manifest",
+                    {},
+                ).get("id", "")
+            )
+            paths.ensure_app_data_dir(app_id)
+            return (
+                paths.get_app_data_dir(app_id)
+                / "config.json"
+            )
+        except Exception:
+            return None
+
+    def _load_data_config(self):
+        config_path = self._data_config_path()
+
+        if config_path and config_path.exists():
+            try:
+                return json.loads(
+                    config_path.read_text(
+                        encoding="utf-8"
+                    )
+                )
+            except Exception:
+                pass
+
+        legacy = self._load_cache_config()
+
+        if legacy:
+            try:
+                self._save_data_config(legacy)
+            except Exception:
+                pass
+
+        return legacy or {}
+
+    def _save_data_config(self, updates: dict):
+        config_path = self._data_config_path()
 
         if not config_path:
             return False
@@ -1509,7 +1798,7 @@ class ExporterWindow(QMainWindow, eD_UIBase):
             )
         else:
             self.preview_info.setText("")
-    
+
     def _cancel_temp_status(self):
         try:
             if self._status_timer.isActive():
