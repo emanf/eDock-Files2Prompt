@@ -21,8 +21,9 @@ This app helps you collect selected files from a project and export their conten
 2. Launch Files2Prompt app.
 3. Select the root folder.
 4. Select the files you want to export.
-5. Copy or save the exported content.
-6. Send it to an AI assistant when needed.
+5. Click on the preview button.
+6. Copy or save the exported content.
+7. Send it to an AI assistant when needed.
 
 ## App Info
 
