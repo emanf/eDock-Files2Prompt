@@ -8,24 +8,6 @@ Files2Prompt is a focused eDock utility for collecting selected files from a pro
 
 When a project contains many files, copying useful context manually is slow and error-prone. Files2Prompt lets you select a project root, exclude irrelevant files, choose exactly what should be included, preview the result, and copy or export the final text.
 
-## Features
-
-- Select any project or root folder.
-- Recursively scan files under the selected root.
-- Remember the last selected root folder.
-- Filter the scanned file list by file name or relative path.
-- Check individual files.
-- Check or uncheck all files currently visible through the filter.
-- Build a separate export list from checked files.
-- Prevent duplicate files in the export list.
-- Remove selected export entries or clear the complete list.
-- Preview the generated output before copying or saving.
-- Copy all generated content to the clipboard.
-- Copy individual parts of a large export.
-- Save the generated content as a text file.
-- Read text files as UTF-8 while preserving readable replacement characters.
-- Keep going when one file cannot be read by adding a file-read error marker to the output.
-
 ## Exclude Patterns
 
 The Exclude Patterns dialog supports `.gitignore`-style rules. The default list avoids common source-control, dependency, cache, and build files:
